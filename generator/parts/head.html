@@ -1,0 +1,268 @@
+<title>Structure Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed 3D stage, a drafting-desk side panel on the right (bottom sheet on phones),
+   and a view strip along the bottom. Single dark look on purpose: a night drafting table, amber pencil accents. */
+:root {
+  --bg: #0d1013;          /* drafting table at night */
+  --panel: #14191e;       /* panel board */
+  --panel-2: #1a2128;
+  --line: #27313a;        /* ruled line */
+  --fg: #dde3e8;          /* tracing paper */
+  --muted: #84909b;
+  --accent: #e2b04f;      /* amber pencil */
+  --live: #7cc8e6;        /* blueprint cyan */
+  --danger: #e57a6c;
+  --display: "Archivo Narrow", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 13px; overflow: hidden; }
+[hidden] { display: none !important; }
+.app { height: 100%; display: grid; grid-template-rows: 1fr auto; }
+.main { position: relative; min-height: 0; display: grid; grid-template-columns: 1fr auto; }
+.view { position: relative; min-width: 0; min-height: 0; }
+canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; outline: none; }
+canvas.edit { cursor: default; }
+canvas.dragging { cursor: grabbing; }
+.title { position: absolute; top: 16px; left: 16px; right: 16px; pointer-events: none;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.title h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(22px, 3vw, 34px);
+  letter-spacing: .05em; text-transform: uppercase; line-height: 1; text-wrap: balance; }
+.title p { margin: 6px 0 0; color: var(--muted); font-size: 12px; letter-spacing: .03em; }
+.compass { font-size: 12px; color: var(--accent); text-align: right; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line); padding: 6px 10px; background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.compass b { display: block; font-family: var(--display); font-size: 22px; color: var(--fg); letter-spacing: .05em; }
+.modehint { position: absolute; left: 16px; bottom: 12px; color: var(--live); font-size: 11px; letter-spacing: .05em;
+  background: color-mix(in srgb, var(--bg) 75%, transparent); padding: 4px 8px; border: 1px solid var(--line); pointer-events: none; max-width: calc(100% - 32px); }
+
+.panel { position: relative; width: var(--panel-w, 350px); max-width: 100vw; background: var(--panel); border-left: 1px solid var(--line);
+  overflow-y: auto; padding-block: 14px 24px; display: flex; flex-direction: column; gap: 18px; }
+.panel section { padding-inline: 16px; display: flex; flex-direction: column; gap: 10px; }
+.panel h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.panel h2 small { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: .03em; color: var(--muted); text-transform: none; }
+.panel details > summary { list-style: none; cursor: pointer; }
+.panel details > summary::-webkit-details-marker { display: none; }
+.panel details > summary h2::before { content: "▾ "; color: var(--muted); }
+.panel details:not([open]) > summary h2::before { content: "▸ "; }
+.panel details[open] > summary { margin-bottom: 10px; }
+.stack { display: grid; gap: 10px; }
+.catalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.catalog button { padding: 9px 4px; font-size: 11px; text-align: center; line-height: 1.25; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 5px 8px; font-size: 11px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > span { color: var(--muted); font-size: 11px; letter-spacing: .03em; }
+.field .pair { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+select, input[type=text], input[type=number], input[type=search] { box-sizing: border-box; width: 100%; min-width: 0; font: 12px var(--mono); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); padding: 7px 8px; border-radius: 2px; }
+input[type=color] { box-sizing: border-box; width: 100%; height: 32px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 2px; }
+.empty { color: var(--muted); font-size: 12px; line-height: 1.5; border: 1px dashed var(--line); padding: 10px; margin: 0; }
+.sel-name { font-family: var(--display); font-size: 21px; letter-spacing: .03em; }
+.slider { display: grid; grid-template-columns: 74px minmax(0, 1fr) 56px; gap: 8px; align-items: center; }
+.slider span:first-child { color: var(--muted); font-size: 11px; }
+.slider output { text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.check { display: flex; gap: 8px; align-items: center; color: var(--fg); font-size: 12px; }
+.check input { accent-color: var(--accent); }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sub { border: 1px solid var(--line); padding: 10px; display: grid; gap: 10px; }
+.sub > summary { color: var(--fg); font-size: 12px; }
+.sub > summary::before { content: "+ "; color: var(--accent); }
+.sub[open] > summary::before { content: "− "; }
+.mine { display: flex; gap: 0; }
+.mine button:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-right: 0; }
+.mine button:last-child { padding-inline: 8px; color: var(--muted); }
+.dims { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.5; }
+.blist { display: grid; gap: 4px; }
+.blist button { text-align: left; display: flex; justify-content: space-between; gap: 8px; }
+.blist button small { color: inherit; opacity: .75; }
+.grip { position: absolute; left: -5px; top: 0; bottom: 0; width: 10px; cursor: ew-resize; z-index: 2; }
+.grip::after { content: ""; position: absolute; left: 4px; top: 50%; height: 44px; margin-top: -22px; width: 2px; background: var(--line); border-radius: 2px; }
+.grip:hover::after, .grip:focus-visible::after { background: var(--accent); }
+
+button { font: 500 12px/1 var(--mono); color: var(--fg); background: transparent; border: 1px solid var(--line);
+  padding: 8px 10px; cursor: pointer; letter-spacing: .02em; border-radius: 2px; }
+button:hover { border-color: var(--accent); }
+button[aria-pressed="true"], button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, canvas:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+
+.bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--panel); border-top: 1px solid var(--line); }
+.group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.group > span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-right: 2px; }
+.bar input[type=range] { width: 120px; }
+.toast { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--accent);
+  padding: 8px 12px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .2s; max-width: calc(100% - 32px); z-index: 3; }
+.toast.show { opacity: 1; }
+.err { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; }
+@media (max-width: 760px) {
+  .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .panel { width: auto; max-height: 48vh; border-left: 0; border-top: 1px solid var(--line); }
+  .grip { display: none; }
+  .bar input[type=range] { width: 90px; }
+  .title p { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<div class="app">
+  <div class="main">
+    <div class="view">
+      <canvas id="c" tabindex="0" aria-label="3D design of buildings and a site. Drag to rotate, scroll to zoom. In edit mode, drag objects to move them."></canvas>
+      <div class="title">
+        <div>
+          <h1 id="projName">Structure Studio</h1>
+          <p id="subtitle"></p>
+        </div>
+        <div class="compass" aria-live="polite"><b id="hdg">315°</b>CAMERA HEADING</div>
+      </div>
+      <div class="modehint" id="modehint" hidden>EDIT · drag objects anywhere · Alt-drag = up/down · drag empty ground to orbit</div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div id="drawLabel" class="compass" style="position:absolute;pointer-events:none;text-align:left" hidden></div>
+      <div class="err" id="err" hidden></div>
+    </div>
+
+    <aside class="panel" id="panel" aria-label="Design editor" hidden>
+      <div class="grip" id="grip" role="separator" aria-orientation="vertical" aria-label="Resize the editor panel" tabindex="0"></div>
+
+      <section>
+        <details id="secProject"><summary><h2>Project <small>start from a template</small></h2></summary>
+        <div class="stack">
+          <label class="field"><span>Project name</span><input type="text" id="pjName" maxlength="48"></label>
+          <div class="catalog" id="tplButtons"></div>
+          <div class="row" id="tplConfirm" hidden><span class="empty" style="flex:1" id="tplMsg"></span><button id="tplYes" class="danger">Replace</button><button id="tplNo">Keep</button></div>
+        </div>
+        </details>
+      </section>
+
+      <section>
+        <details id="secAdd" open><summary><h2>Add <small id="addWhere"></small></h2></summary>
+        <div class="stack">
+          <input type="search" id="catSearch" placeholder="Search: sofa, tree, tower, window…" aria-label="Search objects">
+          <div class="chips" id="catChips" role="tablist" aria-label="Object categories"></div>
+          <div class="catalog" id="catalog"></div>
+        </div>
+        </details>
+      </section>
+
+      <section>
+        <details id="secMine"><summary><h2>My items <small>custom &amp; imported</small></h2></summary>
+        <div class="stack">
+          <div class="catalog" id="mycatalog"></div>
+          <details class="sub" id="customForm">
+            <summary>Create a custom item</summary>
+            <label class="field"><span>Name</span><input type="text" id="cName" maxlength="40" value="Custom unit"></label>
+            <label class="field"><span>Shape</span><select id="cShape">
+              <option value="box">Box (cabinet, crate, block)</option>
+              <option value="cyl">Cylinder (drum, column, tank)</option>
+              <option value="panel">Flat panel (screen, poster, board)</option></select></label>
+            <div class="grid3">
+              <label class="field"><span>Width m</span><input type="number" id="cW" min="0.05" max="40" step="0.05" value="1.2"></label>
+              <label class="field"><span>Depth m</span><input type="number" id="cD" min="0.02" max="40" step="0.05" value="0.6"></label>
+              <label class="field"><span>Height m</span><input type="number" id="cH" min="0.02" max="40" step="0.05" value="1.0"></label>
+            </div>
+            <div class="grid2">
+              <label class="field"><span>Above floor m</span><input type="number" id="cZ" min="0" max="30" step="0.05" value="0"></label>
+              <label class="field"><span>Colour</span><input type="color" id="cColor" value="#4a5560"></label>
+            </div>
+            <label class="field"><span>Picture on it (optional)</span><span class="pair"><select id="cImg"></select><button id="cUpload">Upload…</button></span></label>
+            <label class="field"><span>Picture goes on</span><select id="cFace"><option value="front">Front face</option><option value="top">Top face</option></select></label>
+            <label class="check"><input type="checkbox" id="cWall"> Mount on a wall</label>
+            <label class="check"><input type="checkbox" id="cSave" checked> Keep in My items for reuse</label>
+            <button id="cAdd" class="primary">Add</button>
+            <input type="file" id="cFile" accept="image/*" hidden>
+          </details>
+          <div class="row"><button id="importModel">Import 3D model (.glb / .obj)</button><input id="modelFile" type="file" accept=".glb,.gltf,.obj" hidden></div>
+          <p class="dims" style="margin:0">Models from Blender, SketchUp, Sketchfab and similar work as .glb (textures included) or .obj.</p>
+        </div>
+        </details>
+      </section>
+
+      <section aria-live="polite">
+        <h2>Selected</h2>
+        <select id="pick" aria-label="Select an object"></select>
+        <div id="inspector"></div>
+      </section>
+
+      <section>
+        <details id="secBuild" open><summary><h2>Buildings <small id="bldSummary"></small></h2></summary>
+        <div class="stack">
+          <div class="blist" id="bldList"></div>
+          <div class="row"><select id="newShape" aria-label="Shape of the new building" style="flex:1"></select><button id="addBld">Add building</button></div>
+          <div id="bldPanel" class="stack"></div>
+        </div>
+        </details>
+      </section>
+
+      <section>
+        <details id="secDraw" open><summary><h2>Draw <small>walls, roads, fences…</small></h2></summary>
+        <div class="stack">
+          <div class="row"><select id="drawType" aria-label="What to draw" style="flex:1"></select><button id="drawBtn" aria-pressed="false">Draw</button></div>
+          <p class="dims" id="drawHint" style="margin:0" hidden>Click to start, click again to finish a segment, keep clicking to chain. Ends snap to corners, other ends and walls. Esc or double-click stops the chain.</p>
+          <label class="check"><input id="angleSnap" type="checkbox" checked> Snap to 15° angles</label>
+          <label class="check"><input id="snap" type="checkbox"> Snap to a 0.25 m grid</label>
+        </div>
+        </details>
+      </section>
+
+      <section>
+        <details id="secSite"><summary><h2>Site <small id="siteSummary"></small></h2></summary>
+        <div class="stack">
+          <label class="slider"><span>Width</span><input id="sw" type="range" min="10" max="300" step="5"><output id="swo"></output></label>
+          <label class="slider"><span>Depth</span><input id="sd" type="range" min="10" max="300" step="5"><output id="sdo"></output></label>
+          <label class="field"><span>Ground</span><select id="sGround"></select></label>
+        </div>
+        </details>
+      </section>
+
+      <section>
+        <h2>Layout</h2>
+        <div class="row">
+          <button id="undo">Undo</button><button id="redo">Redo</button>
+          <button id="saveLayout">Save file</button><button id="openLayout">Open file</button>
+          <input id="layoutFile" type="file" accept=".json,application/json" hidden>
+        </div>
+        <div class="row">
+          <button id="kit" class="primary">Download Blender kit (.zip)</button>
+          <button id="shot">Snapshot (.png)</button>
+        </div>
+        <p class="dims" style="margin:0">The Blender kit holds this design as <code>scene.json</code> with its textures, the builder script and a ready <code>.glb</code>. Your design also saves in this browser.</p>
+      </section>
+    </aside>
+  </div>
+
+  <div class="bar">
+    <div class="group"><button id="editBtn" aria-pressed="false">Edit</button></div>
+    <div class="group" role="group" aria-label="Floors to show">
+      <span>Level</span><span id="levels" class="row" style="gap:4px"></span>
+    </div>
+    <div class="group" role="group" aria-label="Inside or outside view">
+      <span>See</span><button id="cutBtn" aria-pressed="true">Inside</button><button id="outBtn" aria-pressed="false">Outside</button>
+    </div>
+    <div class="group" role="group" aria-label="Rotation">
+      <span>Rotate</span>
+      <button id="spin" aria-pressed="true">Turntable</button>
+      <input id="az" type="range" min="0" max="359" value="315" aria-label="Camera heading in degrees">
+    </div>
+    <div class="group" role="group" aria-label="Preset views">
+      <button data-az="45" data-el="35.26" title="Camera south-east">SE</button>
+      <button data-az="135" data-el="35.26" title="Camera north-east">NE</button>
+      <button data-az="225" data-el="35.26" title="Camera north-west">NW</button>
+      <button data-az="315" data-el="35.26" title="Camera south-west">SW</button>
+      <button data-az="0" data-el="89">Plan</button>
+      <button id="fitBtn" title="Frame the whole site">Fit</button>
+    </div>
+    <div class="group" role="group" aria-label="Projection">
+      <button id="iso" aria-pressed="true">Iso</button>
+      <button id="persp" aria-pressed="false">Persp</button>
+    </div>
+  </div>
+</div>
